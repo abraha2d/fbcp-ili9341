@@ -3,12 +3,44 @@
 #if defined(ILI9486) || defined(ILI9486L)
 
 #include "spi_user.h"
+#include "XPT2046.h"
 
 #include <memory.h>
 #include <stdio.h>
 
+XPT2046 touch;
+#define LOOP_INTERVAL 500
+static int loop = 0;
+
+void ChipSelectHigh()
+{
+  WAIT_SPI_FINISHED();
+  SET_GPIO(GPIO_SPI0_CE1); // Disable Display
+  CLEAR_GPIO(GPIO_SPI0_CE0); // Enable Touch
+  __sync_synchronize();
+  if(loop++ % LOOP_INTERVAL == 0) {
+      touch.read_touchscreen(true);
+      __sync_synchronize();
+  }
+  if(hasInterrupt()) {
+	touch.read_touchscreen(false);
+      __sync_synchronize();
+  }
+  SET_GPIO(GPIO_SPI0_CE0); // Disable Touch
+  CLEAR_GPIO(GPIO_SPI0_CE1); // Enable Display
+  __sync_synchronize();
+}
+
 void InitILI9486()
 {
+  // output device
+  touch = XPT2046();
+
+  touch.setRotation(0);
+#ifdef DISPLAY_ROTATE_180_DEGREES
+  touch.setRotation(1);
+#endif
+
   // If a Reset pin is defined, toggle it briefly high->low->high to enable the device. Some devices do not have a reset pin, in which case compile with GPIO_TFT_RESET_PIN left undefined.
 #if defined(GPIO_TFT_RESET_PIN) && GPIO_TFT_RESET_PIN >= 0
   printf("Resetting display at reset GPIO pin %d\n", GPIO_TFT_RESET_PIN);
